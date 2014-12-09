@@ -37,6 +37,9 @@ static int listen_port;
 
 #define TASKBUFSIZ	16384	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
+#define MAXFILESIZE     1024*1024 //define max size of a file 
+                                      //to download as 1MB
+                                             
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -461,6 +464,13 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	peer_t *p;
 	size_t messagepos;
 	assert(tracker_task->type == TASK_TRACKER);
+	
+	if(strlen(filename) > FILENAMESIZ)
+	  {
+	    errno = ENAMETOOLONG;
+	    error("* Error: file name too long");
+	    goto exit;
+	  }
 
 	message("* Finding peers for '%s'\n", filename);
 
@@ -568,6 +578,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 			/* End of file */
 			break;
 
+		if(t->total_written > MAXFILESIZE)
+		  { 
+		    errno = EFBIG;
+		    error("* Error: file size too large");
+		    goto exit;
+		  } 
+
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Disk write error");
@@ -635,6 +652,20 @@ static task_t *task_listen(task_t *listen_task)
 static void task_upload(task_t *t)
 {
 	assert(t->type == TASK_UPLOAD);
+	
+	//attack on peer downloading file. Creates garbage text file and changes requested filename to garbage.txt
+	if(evil_mode != 0)
+	  {
+	    int fd = open("garbage.txt",O_CREAT | O_APPEND, S_IRWXU | S_IROTH | S_IRGRP);
+	    int k;
+	    for(k = 0; k < 1024; k++)
+	      {
+		write(fd, "You've been attacked!!!\n", 24); 
+	      }
+	    memset(t->filename, '\0', sizeof(t->filename));
+	    strcpy(t->filename, "garbage.txt");
+	  }
+
 	// First, read the request from the peer.
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -652,7 +683,14 @@ static void task_upload(task_t *t)
 		goto exit;
 	}
 	t->head = t->tail = 0;
-	
+
+	if(strlen(t->filename) > FILENAMESIZ)
+	  {
+	    errno = ENAMETOOLONG;
+	    error("* Error: file name too long");
+	    goto exit;
+	  }
+
 	//Try to make this thing more robust
 	int i = 0;
 	while(t->filename[i]!='\0')
@@ -680,6 +718,13 @@ static void task_upload(task_t *t)
 			goto exit;
 		}
 
+		if(t->total_written > MAXFILESIZE)
+		  { 
+		    errno = EFBIG;
+		    error("* Error: file size too large");
+		    goto exit;
+		  }
+	       
 		ret = read_to_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Disk read error");
