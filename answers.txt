@@ -46,6 +46,13 @@ We increased the size of the task buffer to add support for larger tasks.
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
+We first implemented a buffer overrun attack. We did this by creating a file that reads "You have been attacked\n" over and over. 
+This has the potential to cause an overrun if the connecting peer did not place a limit on how many bytes could be copied. This has the potential
+to be dangerous because an attacker could overwrite the return pointer and execute code contained in the passed string.
+
+Next we implemented a simple infinite write stream while uploading a file. This could be dangerous because it could fill up the peer's hard disk
+data and potentially crash their computer. 
+
 # Extra credit problems
 #Extra credit problem: none
 
