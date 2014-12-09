@@ -37,6 +37,9 @@ static int listen_port;
 
 #define TASKBUFSIZ	4096	// Size of task_t::buf
 #define FILENAMESIZ	256	// Size of task_t::filename
+#define MAXFILESIZE     1024*1024*500 //define max size of a file 
+                                      //to download as 500MB
+                                             
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -461,6 +464,13 @@ task_t *start_download(task_t *tracker_task, const char *filename)
 	peer_t *p;
 	size_t messagepos;
 	assert(tracker_task->type == TASK_TRACKER);
+	
+	if(strlen(filename) > FILENAMESIZ)
+	  {
+	    errno = ENAMETOOLONG;
+	    error("* Error: file name too long");
+	    goto exit;
+	  }
 
 	message("* Finding peers for '%s'\n", filename);
 
@@ -568,6 +578,13 @@ static void task_download(task_t *t, task_t *tracker_task)
 			/* End of file */
 			break;
 
+		if(t->total_written > MAXFILESIZE)
+		  { 
+		    errno = EFBIG;
+		    error("* Error: file size too large");
+		    goto exit;
+		  } 
+
 		ret = write_from_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Disk write error");
@@ -652,7 +669,14 @@ static void task_upload(task_t *t)
 		goto exit;
 	}
 	t->head = t->tail = 0;
-	
+
+	if(strlen(t->filename) > FILENAMESIZ)
+	  {
+	    errno = ENAMETOOLONG;
+	    error("* Error: file name too long");
+	    goto exit;
+	  }
+
 	//Try to make this thing more robust
 	int i = 0;
 	while(t->filename[i]!='\0')
@@ -679,6 +703,13 @@ static void task_upload(task_t *t)
 			error("* Peer write error");
 			goto exit;
 		}
+
+		if(t->total_written > MAXFILESIZE)
+		  { 
+		    errno = EFBIG;
+		    error("* Error: file size too large");
+		    goto exit;
+		  }
 
 		ret = read_to_taskbuf(t->disk_fd, t);
 		if (ret == TBUF_ERROR) {
