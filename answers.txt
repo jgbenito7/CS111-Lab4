@@ -38,8 +38,10 @@ strncpy and set FILENAMESIZ to be the max amount of bytes able to be copied over
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
 
-We fixed the possibility of peers serving files outside of the current directory by looking for 
+We fixed the possibility of peers serving files outside of the current directory. We did this by looking for 
 a '/' in the filename. 
+
+We increased the size of the task buffer to add support for larger tasks.
 
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
