@@ -1,6 +1,7 @@
 // -*- mode: c++ -*-
 #define _BSD_EXTENSION
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <errno.h>
 #include <signal.h>
@@ -24,6 +25,7 @@
 #include "osp2p.h"
 
 int evil_mode;			// nonzero iff this peer should behave badly
+char passkey[] = "pass";
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -39,6 +41,8 @@ static int listen_port;
 #define FILENAMESIZ	256	// Size of task_t::filename
 #define MAXFILESIZE     1024*1024 //define max size of a file 
                                       //to download as 1MB
+                                      
+
                                              
 
 typedef enum tasktype {		// Which type of connection is this?
@@ -536,6 +540,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 		error("* Cannot connect to peer: %s\n", strerror(errno));
 		goto try_again;
 	}
+	
+
+	
+	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 
 	// Open disk file for the result.
@@ -829,6 +837,21 @@ int main(int argc, char *argv[])
 	tracker_task = start_tracker(tracker_addr, tracker_port);
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
+	
+	///Reading Input Test
+	
+	
+	
+	char str[4];
+	while(strcmp(passkey,str)!=0) {
+		printf("Enter the encryption key to download the files: ");
+		scanf("%s", str);	
+		if(strcmp(passkey,str)!=0)
+		{
+			printf("Wrong encryption key...\n");
+		}
+	}
+	printf("Password Validated!\n");
 	
 	//Parallelize the downloads
 	pid_t pid;
