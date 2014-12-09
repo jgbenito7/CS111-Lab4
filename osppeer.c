@@ -41,9 +41,7 @@ static int listen_port;
 #define FILENAMESIZ	256	// Size of task_t::filename
 #define MAXFILESIZE     1024*1024 //define max size of a file 
                                       //to download as 1MB
-                                      
-
-                                             
+                                                                             
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -141,6 +139,48 @@ static void task_free(task_t *t)
 		} while (t->peer_list);
 		free(t);
 	}
+}
+
+///////////////////////////////////////
+//Design Problem Encryption Functions//
+///////////////////////////////////////
+
+void Encrypt(int fd){ 
+
+	char buf[4096];
+	int cur = 0;
+	
+	printf("%i",fd); printf("\n");
+	
+	/*while((cur = read(fd,buf,4096))!=0)
+	{
+		printf("%i", cur);
+		printf("\n"); 
+	}*/
+
+   /* int i; 
+    while ( ( i = fgetc(file) )!=EOF ){ 
+        i = i + 1; 
+        fseek(file, -1, SEEK_CUR); 
+        fputc(i,file); 
+        fseek(file, 0, SEEK_CUR); 
+    } */
+} 
+
+void Decrypt(FILE *file){ 
+    rewind(file); 
+    /*go through the file and change all characters back from 1 */ 
+    rewind(file); 
+    int i; 
+    while ( ( i = fgetc(file) )!=EOF ){ 
+        i = i - 1; 
+        fseek(file, -1, SEEK_CUR); 
+        fputc(i,file); 
+        //fflush(file); 
+       /* fflush not needed if making a call to fseek. Either one is needed for  
+        manipulating a stream with i/o and vice versa */ 
+        fseek(file, 0, SEEK_CUR); 
+    } 
 }
 
 
@@ -577,7 +617,9 @@ static void task_download(task_t *t, task_t *tracker_task)
 
 	// Read the file into the task buffer from the peer,
 	// and write it from the task buffer onto disk.
+	printf("on a new peer\n");
 	while (1) {
+		
 		int ret = read_to_taskbuf(t->peer_fd, t);
 		if (ret == TBUF_ERROR) {
 			error("* Peer read error");
@@ -585,7 +627,9 @@ static void task_download(task_t *t, task_t *tracker_task)
 		} else if (ret == TBUF_END && t->head == t->tail)
 			/* End of file */
 			break;
-
+		
+		Encrypt(tracker_task->peer_fd);
+		
 		if(t->total_written > MAXFILESIZE)
 		  { 
 		    errno = EFBIG;
@@ -594,6 +638,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 		  } 
 
 		ret = write_from_taskbuf(t->disk_fd, t);
+		
+		printf("Should print the file descriptor\n");
+		
+		
 		if (ret == TBUF_ERROR) {
 			error("* Disk write error");
 			goto try_again;
@@ -758,6 +806,7 @@ static void task_upload(task_t *t)
     exit:
 	task_free(t);
 }
+
 
 
 // main(argc, argv)
