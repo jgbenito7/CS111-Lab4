@@ -41,7 +41,7 @@ static int listen_port;
 #define FILENAMESIZ	256	// Size of task_t::filename
 #define MAXFILESIZE     1024*1024 //define max size of a file 
                                       //to download as 1MB
-                                                                             
+#define MAXPASSKEYSIZE 20   // size of passkey                                                                             
 
 typedef enum tasktype {		// Which type of connection is this?
 	TASK_TRACKER,		// => Tracker connection
@@ -77,6 +77,7 @@ typedef struct task {
 				// function initializes this list;
 				// task_pop_peer() removes peers from it, one
 				// at a time, if a peer misbehaves.
+        char pwd[MAXPASSKEYSIZE]; // peer's password
 } task_t;
 
 
@@ -142,47 +143,35 @@ static void task_free(task_t *t)
 }
 
 ///////////////////////////////////////
-//Design Problem Encryption Functions//
+//Design Problem Encryption Function///
 ///////////////////////////////////////
 
-void Encrypt(int fd){ 
+int Encrypt(char* filename)
+{ 
+  FILE *orig;
+  FILE *crypt;
 
-	char buf[4096];
-	int cur = 0;
-	
-	printf("%i",fd); printf("\n");
-	
-	/*while((cur = read(fd,buf,4096))!=0)
+  int byte;
+  
+  if((orig = fopen(filename, "r+")) == NULL || (crypt = fopen("encrypt_temp", "a")) == NULL)
+    { 
+      error("* Error: unable to open file");
+      return 0;
+    }
+  
+  while ((byte = fgetc(orig)) != EOF) 
+    {
+      byte = byte^200;
+      if (fputc(byte, crypt) == EOF)
 	{
-		printf("%i", cur);
-		printf("\n"); 
-	}*/
-
-   /* int i; 
-    while ( ( i = fgetc(file) )!=EOF ){ 
-        i = i + 1; 
-        fseek(file, -1, SEEK_CUR); 
-        fputc(i,file); 
-        fseek(file, 0, SEEK_CUR); 
-    } */
+	  error("* Encryption error\n");
+	  return 0;
+	}
+    }
+  remove(filename);
+  rename("encrypt_temp",filename);
+  return 1;
 } 
-
-void Decrypt(FILE *file){ 
-    rewind(file); 
-    /*go through the file and change all characters back from 1 */ 
-    rewind(file); 
-    int i; 
-    while ( ( i = fgetc(file) )!=EOF ){ 
-        i = i - 1; 
-        fseek(file, -1, SEEK_CUR); 
-        fputc(i,file); 
-        //fflush(file); 
-       /* fflush not needed if making a call to fseek. Either one is needed for  
-        manipulating a stream with i/o and vice versa */ 
-        fseek(file, 0, SEEK_CUR); 
-    } 
-}
-
 
 /******************************************************************************
  * TASK BUFFER
@@ -723,6 +712,7 @@ static void task_upload(task_t *t)
 	    strcpy(t->filename, "garbage.txt");
 	  }
 
+
 	// First, read the request from the peer.
 	while (1) {
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -759,6 +749,21 @@ static void task_upload(task_t *t)
 		}
 		i++;
 	}
+	
+	if(!Encrypt(t->filename))
+	  {
+	    error("Encryption failed!\n");
+	    goto exit;
+	  }
+
+	if(!strcmp(t->pwd,passkey))
+	  {
+	    if(!Encrypt(t->filename))
+	      {
+		 error("Decryption failed!\n");
+		 goto exit;
+	      }
+	  }
 
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
