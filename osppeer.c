@@ -906,13 +906,14 @@ int main(int argc, char *argv[])
 		encrypt_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
-	} else if (argc >= 2 && strcmp(argv[1], "-c") == 0) {
+	} else if (argc >= 2 && strcmp(argv[1], "-ec")==0) {
+		encrypt_mode = 1;
 		change_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
 	} else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
 				 || strcmp(argv[1], "-h") == 0)) {
-		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b | -e | -c]\n"
+		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b | -e] [-c]\n"
 "Options: -tADDR:PORT  Set tracker address and/or port.\n"
 "         -dDIR        Upload and download files from directory DIR.\n"
 "         -b[MODE]     Evil mode!!!!!!!!\n"
