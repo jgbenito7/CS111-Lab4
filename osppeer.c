@@ -571,8 +571,17 @@ static void task_download(task_t *t, task_t *tracker_task)
 		goto try_again;
 	}
 	
-
-	
+	if(encrypt_mode != 0)
+	{
+	  if(!strcmp(t->pwd,passkey))
+	    {
+	      if(!Encrypt(t->filename))
+		{
+		  error("Decryption failed!\n");
+		  goto exit;
+		}
+	    }
+	}
 	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 

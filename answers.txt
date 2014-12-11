@@ -19,8 +19,8 @@ Email: jgbenito7@gmail.com
 
 # Partner 2 (if you're working in a team)
 Name: Patrick Killian Jackson
-Student ID: 
-Email: 
+Student ID: 504184347
+Email: killianjackson@yahoo.com
 
 # EXERCISE 1: What method you used to make your peer download and upload
 #    files in parallel?  (~1-3 sentences)
@@ -35,6 +35,8 @@ process per instance of downloading or uploading.
 The use of strcpy has the potential to be unsafe due to the possibility of a buffer overrun. We changed this to 
 strncpy and set FILENAMESIZ to be the max amount of bytes able to be copied over. 
 
+We also added a second check in both start_download and task_upload to exit with an error message if the filename length is greater than FILENAMESIZ.
+
 # EXERCISE 2B: What other robustness problems did you fix?  (~1-3 sentences
 #    each)
 
@@ -43,12 +45,14 @@ a '/' in the filename.
 
 We increased the size of the task buffer to add support for larger tasks.
 
+We added a global variable, MAXFILESIZE, for the maximum size of a file that can be uploaded or downloaded. We set MAXFILESIZE to 1MB. In the functions task_download and task_upload, we added checks as we read from the task buffer/disk and write to the task buffer/disk to make sure the total_written is less than or equal to MAXFILESIZE. If the file size is too big, we exit with an error message. 
+
 # EXERCISE 3: Describe the attacks you implemented for "evil mode".  Why
 #    are they attacks?  (~3-10 sentences each)
 
-We first implemented a buffer overrun attack. We did this by creating a file that reads "You have been attacked\n" over and over. 
+We first implemented a buffer overrun attack. We did this by creating a file that reads "You have been attacked!!!\n" over and over. 
 This has the potential to cause an overrun if the connecting peer did not place a limit on how many bytes could be copied. This has the potential
-to be dangerous because an attacker could overwrite the return pointer and execute code contained in the passed string.
+to be dangerous because an attacker could overwrite the return pointer and execute code contained in the passed string. Also, even if this does not cause a buffer overrun, this attack also uploads to the peer a file full of useless text instead of the file the peer requested.
 
 Next we implemented a simple infinite write stream while uploading a file. This could be dangerous because it could fill up the peer's hard disk
 data and potentially crash their computer. 
