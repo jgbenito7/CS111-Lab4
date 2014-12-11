@@ -576,10 +576,10 @@ static void task_download(task_t *t, task_t *tracker_task)
 	  if(!strcmp(t->pwd,passkey))
 	    {
 	      if(!Encrypt(t->filename))
-		{
-		  error("Decryption failed!\n");
-		  goto exit;
-		}
+			{
+			  error("Decryption failed!\n");
+			  goto try_again;
+			}
 	    }
 	}
 	
