@@ -178,6 +178,8 @@ int Encrypt(char* filename)
 		}
     }
 
+  //removes the original file and renames the encrypted file with the original
+  //file's name
   remove(filename);
   rename("encrypt_temp",filename);
   return 1;
@@ -585,6 +587,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
 	
+	//password validation
 	if(encrypt_mode!=0)
 	{
 		char str[MAXPASSKEYSIZE];
@@ -662,7 +665,7 @@ static void task_download(task_t *t, task_t *tracker_task)
 		message("* Downloaded '%s' was %lu bytes long\n",
 			t->disk_filename, (unsigned long) t->total_written);
 		if(val==1)
-		{	
+		  {	//decrypt downloaded file if encryption mode is enabled
 			if(!Encrypt(t->filename))
 			{
 			  error("Decryption failed!\n");
@@ -778,10 +781,10 @@ static void task_upload(task_t *t)
 		}
 		i++;
 	}
-	
+	// check if encryption mode is enabled
 	if(encrypt_mode != 0)
 	{
-	
+	        //encrypt file to be uploaded
 		 if(!Encrypt(t->filename))
 		  {
 			error("Encryption failed!\n");
