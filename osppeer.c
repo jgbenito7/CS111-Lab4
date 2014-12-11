@@ -26,7 +26,8 @@
 
 int evil_mode;			// nonzero iff this peer should behave badly
 int encrypt_mode;       //nonzero iff we are in encryption mode
-char passkey[] = "pass";
+int change_mode;		//mode to change the password
+char passkey[] = "pass"; // default password
 
 static struct in_addr listen_addr;	// Define listening endpoint
 static int listen_port;
@@ -79,6 +80,7 @@ typedef struct task {
 				// task_pop_peer() removes peers from it, one
 				// at a time, if a peer misbehaves.
     char pwd[MAXPASSKEYSIZE]; // peer's password
+   
 } task_t;
 
 
@@ -98,7 +100,7 @@ static task_t *task_new(tasktype_t type)
 	t->head = t->tail = 0;
 	t->total_written = 0;
 	t->peer_list = NULL;
-
+	strcpy(t->pwd,"pass");
 	strcpy(t->filename, "");
 	strcpy(t->disk_filename, "");
 
@@ -153,22 +155,29 @@ int Encrypt(char* filename)
   FILE *crypt;
 
   int byte;
-  
-  if((orig = fopen(filename, "r+")) == NULL || (crypt = fopen("encrypt_temp", "a")) == NULL)
+   
+  if((orig = fopen(filename, "r+")) == NULL)
     { 
-      error("* Error: unable to open file");
+      error("* Error: unable to open file for reading");
       return 0;
     }
-  
+
+ if((crypt = fopen("encrypt_temp", "a")) == NULL)
+ {
+ 	error("* Error: unable to open temp file");
+ }
+  //Encrypt the file
   while ((byte = fgetc(orig)) != EOF) 
     {
       byte = byte^200;
+      //write each encrypted byte to the crypt file
       if (fputc(byte, crypt) == EOF)
-	{
-	  error("* Encryption error\n");
-	  return 0;
-	}
+		{
+	  		error("* Encryption error\n");
+	  		return 0;
+		}
     }
+
   remove(filename);
   rename("encrypt_temp",filename);
   return 1;
@@ -571,19 +580,25 @@ static void task_download(task_t *t, task_t *tracker_task)
 		goto try_again;
 	}
 	
-	if(encrypt_mode != 0)
-	{
-	  if(!strcmp(t->pwd,passkey))
-	    {
-	      if(!Encrypt(t->filename))
-			{
-			  error("Decryption failed!\n");
-			  goto try_again;
-			}
-	    }
-	}
+	int val = 0;
+
 	
 	osp2p_writef(t->peer_fd, "GET %s OSP2P\n", t->filename);
+	
+	if(encrypt_mode!=0)
+	{
+		char str[MAXPASSKEYSIZE];
+		while(strcmp(t->pwd,str)!=0) {
+			printf("Enter the encryption key to download the files: ");
+			scanf("%s", str);	
+			if(strcmp(passkey,str)!=0)
+			{
+				printf("Wrong encryption key...\n");
+			}
+		}
+		printf("Password Validated!\n");
+		val = 1;
+	}
 
 	// Open disk file for the result.
 	// If the filename already exists, save the file in a name like
@@ -646,6 +661,15 @@ static void task_download(task_t *t, task_t *tracker_task)
 	if (t->total_written > 0) {
 		message("* Downloaded '%s' was %lu bytes long\n",
 			t->disk_filename, (unsigned long) t->total_written);
+		if(val==1)
+		{	
+			if(!Encrypt(t->filename))
+			{
+			  error("Decryption failed!\n");
+			  goto try_again;
+			}
+		}	
+			
 		// Inform the tracker that we now have the file,
 		// and can serve it to others!  (But ignore tracker errors.)
 		if (strcmp(t->filename, t->disk_filename) == 0) {
@@ -758,21 +782,11 @@ static void task_upload(task_t *t)
 	if(encrypt_mode != 0)
 	{
 	
-		if(!Encrypt(t->filename))
+		 if(!Encrypt(t->filename))
 		  {
 			error("Encryption failed!\n");
 			goto exit;
 		  }
-
-		if(!strcmp(t->pwd,passkey))
-		  {
-			if(!Encrypt(t->filename))
-			  {
-			 error("Decryption failed!\n");
-			 goto exit;
-			  }
-		  }
-
 	}
 	
 	t->disk_fd = open(t->filename, O_RDONLY);
@@ -892,12 +906,18 @@ int main(int argc, char *argv[])
 		encrypt_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
+	} else if (argc >= 2 && strcmp(argv[1], "-c") == 0) {
+		change_mode = 1;
+		--argc, ++argv;
+		goto argprocess;
 	} else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
 				 || strcmp(argv[1], "-h") == 0)) {
-		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b]\n"
+		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b | -e | -c]\n"
 "Options: -tADDR:PORT  Set tracker address and/or port.\n"
 "         -dDIR        Upload and download files from directory DIR.\n"
-"         -b[MODE]     Evil mode!!!!!!!!\n");
+"         -b[MODE]     Evil mode!!!!!!!!\n"
+"         -e           Run in encryption mode\n"
+"         -c           Change the password\n");
 		exit(0);
 	}
 
@@ -906,21 +926,44 @@ int main(int argc, char *argv[])
 	listen_task = start_listen();
 	register_files(tracker_task, myalias);
 	
-	///Reading Input Test
-	
-	
-	if(encrypt_mode!=0)
+	if(change_mode!=0)
 	{
-		char str[4];
-		while(strcmp(passkey,str)!=0) {
-			printf("Enter the encryption key to download the files: ");
-			scanf("%s", str);	
-			if(strcmp(passkey,str)!=0)
+		while(1)
+		{
+			printf("Would you like to change your password? (y/n): ");
+			char c;
+			scanf("%c", &c);
+			if(c == 'n')
 			{
-				printf("Wrong encryption key...\n");
+				break;
+			}
+			else if(c == 'y')
+			{
+				printf("Enter old password: ");
+				char oldpass[MAXPASSKEYSIZE];
+				scanf("%s", oldpass);
+				if(strcmp(passkey,oldpass)==0)
+				{
+					printf("Enter new password: ");
+					char newpass[MAXPASSKEYSIZE];
+					scanf("%s",newpass);
+					strncpy(oldpass,newpass,MAXPASSKEYSIZE);
+					printf("New password has been saved!\n");
+					break;
+				}
+				else
+				{
+					printf("Password entered does not match old password\n");
+					continue;
+				}	
+				
+			}
+			else
+			{
+				printf("You must enter 'y' or 'n'\n");
+				continue;
 			}
 		}
-		printf("Password Validated!\n");
 	}
 		
 	//Parallelize the downloads
@@ -929,8 +972,9 @@ int main(int argc, char *argv[])
 	for (; argc > 1; argc--, argv++)
 		if ((t = start_download(tracker_task, argv[1])))
 		{
+			task_download(t,tracker_task);
 			//fork the process
-			pid = fork();
+			/*pid = fork();
 			if(pid>=0)
 			{
 				//child
@@ -942,11 +986,22 @@ int main(int argc, char *argv[])
 				//parent
 				else
 				{
+					int returnStatus;    
+    				waitpid(childPid, &returnStatus, 0);  // Parent process waits here for child to terminate.
+
+					if (returnStatus == 0)  // Verify child process terminated without error.  
+					{
+					   std::cout << "The child process terminated normally." << std::endl;    
+					}
+
+					if (returnStatus == 1)      
+					{
+					   std::cout << "The child process terminated with an error!." << std::endl; 
 					
 				}
 			}
 			else
-				error("Process unable to fork\n");
+				error("Process unable to fork\n");*/
 		}	
 			
 			
