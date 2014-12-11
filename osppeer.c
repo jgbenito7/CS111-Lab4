@@ -25,6 +25,7 @@
 #include "osp2p.h"
 
 int evil_mode;			// nonzero iff this peer should behave badly
+int encrypt_mode;       //nonzero iff we are in encryption mode
 char passkey[] = "pass";
 
 static struct in_addr listen_addr;	// Define listening endpoint
@@ -77,7 +78,7 @@ typedef struct task {
 				// function initializes this list;
 				// task_pop_peer() removes peers from it, one
 				// at a time, if a peer misbehaves.
-        char pwd[MAXPASSKEYSIZE]; // peer's password
+    char pwd[MAXPASSKEYSIZE]; // peer's password
 } task_t;
 
 
@@ -606,7 +607,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 
 	// Read the file into the task buffer from the peer,
 	// and write it from the task buffer onto disk.
-	printf("on a new peer\n");
 	while (1) {
 		
 		int ret = read_to_taskbuf(t->peer_fd, t);
@@ -617,8 +617,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 			/* End of file */
 			break;
 		
-		Encrypt(tracker_task->peer_fd);
-		
 		if(t->total_written > MAXFILESIZE)
 		  { 
 		    errno = EFBIG;
@@ -627,8 +625,6 @@ static void task_download(task_t *t, task_t *tracker_task)
 		  } 
 
 		ret = write_from_taskbuf(t->disk_fd, t);
-		
-		printf("Should print the file descriptor\n");
 		
 		
 		if (ret == TBUF_ERROR) {
@@ -750,21 +746,26 @@ static void task_upload(task_t *t)
 		i++;
 	}
 	
-	if(!Encrypt(t->filename))
-	  {
-	    error("Encryption failed!\n");
-	    goto exit;
-	  }
+	if(encrypt_mode != 0)
+	{
+	
+		if(!Encrypt(t->filename))
+		  {
+			error("Encryption failed!\n");
+			goto exit;
+		  }
 
-	if(!strcmp(t->pwd,passkey))
-	  {
-	    if(!Encrypt(t->filename))
-	      {
-		 error("Decryption failed!\n");
-		 goto exit;
-	      }
-	  }
+		if(!strcmp(t->pwd,passkey))
+		  {
+			if(!Encrypt(t->filename))
+			  {
+			 error("Decryption failed!\n");
+			 goto exit;
+			  }
+		  }
 
+	}
+	
 	t->disk_fd = open(t->filename, O_RDONLY);
 	if (t->disk_fd == -1) {
 		error("* Cannot open file %s", t->filename);
@@ -878,6 +879,10 @@ int main(int argc, char *argv[])
 		evil_mode = 1;
 		--argc, ++argv;
 		goto argprocess;
+	} else if (argc >= 2 && strcmp(argv[1], "-e") == 0) {
+		encrypt_mode = 1;
+		--argc, ++argv;
+		goto argprocess;
 	} else if (argc >= 2 && (strcmp(argv[1], "--help") == 0
 				 || strcmp(argv[1], "-h") == 0)) {
 		printf("Usage: osppeer [-tADDR:PORT | -tPORT] [-dDIR] [-b]\n"
@@ -895,18 +900,20 @@ int main(int argc, char *argv[])
 	///Reading Input Test
 	
 	
-	
-	char str[4];
-	while(strcmp(passkey,str)!=0) {
-		printf("Enter the encryption key to download the files: ");
-		scanf("%s", str);	
-		if(strcmp(passkey,str)!=0)
-		{
-			printf("Wrong encryption key...\n");
+	if(encrypt_mode!=0)
+	{
+		char str[4];
+		while(strcmp(passkey,str)!=0) {
+			printf("Enter the encryption key to download the files: ");
+			scanf("%s", str);	
+			if(strcmp(passkey,str)!=0)
+			{
+				printf("Wrong encryption key...\n");
+			}
 		}
+		printf("Password Validated!\n");
 	}
-	printf("Password Validated!\n");
-	
+		
 	//Parallelize the downloads
 	pid_t pid;
 	// First, download files named on command line.
@@ -940,7 +947,6 @@ int main(int argc, char *argv[])
 	
 	while ((t = task_listen(listen_task)))
 	{
-	
 			//fork the process
 			pid = fork();
 			if(pid>=0)
